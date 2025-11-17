@@ -220,7 +220,7 @@ def init_database():
         
         # Create views and functions after tables exist
         try:
-            from database_setup import create_database_views_and_functions
+            from app.database.utilities import create_database_views_and_functions
             create_database_views_and_functions()
             print("✅ Database views and functions created successfully")
         except Exception as e:

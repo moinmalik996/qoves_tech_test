@@ -1,16 +1,14 @@
+"""Celery configuration."""
 from celery import Celery
-import os
 from kombu import Queue
-
-# Redis configuration
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+from app.core.config import CELERY_BROKER_URL, CELERY_RESULT_BACKEND
 
 # Create Celery app
 celery_app = Celery(
     'facial_processing',
-    broker=REDIS_URL,
-    backend=REDIS_URL,
-    include=['tasks']
+    broker=CELERY_BROKER_URL,
+    backend=CELERY_RESULT_BACKEND,
+    include=['app.tasks.facial_processing']
 )
 
 # Celery configuration
@@ -24,7 +22,7 @@ celery_app.conf.update(
     
     # Task routing
     task_routes={
-        'tasks.process_facial_regions_task': {'queue': 'facial_processing'}
+        'app.tasks.facial_processing.process_facial_regions_task': {'queue': 'facial_processing'}
     },
     
     # Task settings

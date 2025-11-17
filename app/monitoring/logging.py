@@ -259,6 +259,10 @@ def get_rich_logger(name: str, extra: Dict[str, Any] = None) -> RichLoggerAdapte
     logger = logging.getLogger(name)
     return RichLoggerAdapter(logger, extra)
 
+def get_logger(name: str = "app", extra: Dict[str, Any] = None) -> RichLoggerAdapter:
+    """Get a rich logger adapter with formatting. Simplified version with default name."""
+    return get_rich_logger(name, extra)
+
 # Pre-configured loggers for different components
 api_logger = get_rich_logger("api", {"component": "api"})
 task_logger = get_rich_logger("tasks", {"component": "celery"})

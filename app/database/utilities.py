@@ -4,18 +4,20 @@ Creates views, functions, and indexes after table creation.
 """
 
 from sqlalchemy import text
-from database import get_db_session
-from rich_logging import get_rich_logger
+from app.monitoring.logging import get_logger
 
 # Configure logger
-db_logger = get_rich_logger("database_setup", {"component": "postgresql"})
+db_logger = get_logger()
 
 def create_database_views_and_functions():
     """
     Create database views and functions after tables exist.
     This is called after SQLAlchemy creates the tables.
     """
-    db = get_db_session()
+    # Import here to avoid circular import
+    from app.database.connection import SessionLocal
+    
+    db = SessionLocal()
     try:
         db_logger.info("[database]🔧 Creating database views and functions...[/]")
         
@@ -97,7 +99,10 @@ def create_database_views_and_functions():
 
 def get_database_stats():
     """Get basic database statistics for monitoring."""
-    db = get_db_session()
+    # Import here to avoid circular import
+    from app.database.connection import SessionLocal
+    
+    db = SessionLocal()
     try:
         # Check if tables exist first
         table_check = """
@@ -143,7 +148,10 @@ def test_database_connection():
     try:
         db_logger.info("[database]🔍 Testing database connection...[/]")
         
-        db = get_db_session()
+        # Import here to avoid circular import
+        from app.database.connection import SessionLocal
+        
+        db = SessionLocal()
         try:
             # Simple connection test
             result = db.execute(text("SELECT 1 as test")).scalar()

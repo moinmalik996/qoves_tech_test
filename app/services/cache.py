@@ -7,15 +7,14 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from sqlalchemy import desc, func, and_, or_
 
-from database import (
-    get_db_session, TaskResult, ProcessingMetrics,
-    generate_cache_key
-)
-from rich_logging import get_rich_logger
-from metrics import errors_total
+from app.database.connection import SessionLocal
+from app.database.models import TaskResult, ProcessingMetrics
+from app.database.utils import generate_cache_key
+from app.monitoring.logging import get_logger
+from app.monitoring.metrics import errors_total
 
 # Configure logger
-cache_logger = get_rich_logger("cache", {"component": "postgresql_cache"})
+cache_logger = get_logger()
 
 class CacheService:
     """
@@ -34,7 +33,7 @@ class CacheService:
         Returns:
             Cached result dict or None if not found/expired
         """
-        db = get_db_session()
+        db = SessionLocal()
         try:
             # Generate cache key
             cache_key = generate_cache_key(
@@ -100,7 +99,7 @@ class CacheService:
         Returns:
             True if stored successfully, False otherwise
         """
-        db = get_db_session()
+        db = SessionLocal()
         try:
             # Generate cache key
             cache_key = generate_cache_key(
@@ -168,7 +167,7 @@ class CacheService:
                         image_data: str, landmarks: list, segmentation_map: str,
                         show_landmarks: bool = False, region_opacity: float = 0.7) -> bool:
         """Store task error information."""
-        db = get_db_session()
+        db = SessionLocal()
         try:
             cache_key = generate_cache_key(
                 image_data, landmarks, segmentation_map, show_landmarks, region_opacity
@@ -211,7 +210,7 @@ class CacheService:
     
     def get_cache_stats(self, days: int = 7) -> Dict[str, Any]:
         """Get cache performance statistics."""
-        db = get_db_session()
+        db = SessionLocal()
         try:
             # Calculate date range
             end_date = datetime.utcnow()
@@ -274,7 +273,7 @@ class CacheService:
     
     def cleanup_expired_cache(self) -> int:
         """Remove expired cache entries."""
-        db = get_db_session()
+        db = SessionLocal()
         try:
             # Delete expired entries
             deleted_count = db.query(TaskResult).filter(
@@ -300,7 +299,7 @@ class CacheService:
     
     def get_recent_tasks(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent task results for monitoring."""
-        db = get_db_session()
+        db = SessionLocal()
         try:
             recent_tasks = db.query(TaskResult).order_by(
                 desc(TaskResult.submitted_at)
@@ -324,7 +323,7 @@ class CacheService:
     
     def _record_cache_metric(self, metric_type: str, cache_key: str):
         """Record cache-related metrics."""
-        db = get_db_session()
+        db = SessionLocal()
         try:
             metric = ProcessingMetrics(
                 task_id="cache_operation",

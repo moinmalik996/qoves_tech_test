@@ -1,363 +1,183 @@
-# 🎭 Facial Region SVG Service# 🎭 Facial Region SVG Service
+# 🎭 Facial Region SVG Service
 
+A comprehensive FastAPI service that processes facial landmarks and segmentation maps to generate SVG masks using background tasks. Features intelligent PostgreSQL caching, Prometheus metrics, Rich logging, and complete Docker integration.
 
+## ✨ Features
 
-A production-ready FastAPI service that processes facial landmarks using MediaPipe to generate SVG masks with background task processing, PostgreSQL caching, and comprehensive monitoring.A comprehensive FastAPI service that processes facial landmarks and segmentation maps to generate SVG masks using background tasks. Features intelligent PostgreSQL caching, Prometheus metrics, Rich logging, and complete Docker integration.
+### 🚀 Core Processing
+- **Facial Landmark Processing**: Advanced facial region detection and analysis
+- **SVG Generation**: Dynamic SVG mask creation from landmarks and segmentation maps
+- **Background Tasks**: Asynchronous processing with Celery for scalable workloads
+- **REST API**: Clean FastAPI interface with automatic documentation
 
-
-
-## ✨ Features## ✨ Features
-
-
-
-- **MediaPipe Integration**: Process 478 facial landmarks into 5 distinct regions (forehead, nose, under-eyes, mouth)### 🚀 Core Processing
-
-- **Async Processing**: Celery-based background tasks with Redis queue- **Facial Landmark Processing**: Advanced facial region detection and analysis
-
-- **Smart Caching**: PostgreSQL-backed result caching with 98% performance improvement- **SVG Generation**: Dynamic SVG mask creation from landmarks and segmentation maps
-
-- **Production Monitoring**: Prometheus metrics, Rich logging, Grafana dashboards- **Background Tasks**: Asynchronous processing with Celery for scalable workloads
-
-- **Docker Ready**: Complete containerized setup with docker-compose- **REST API**: Clean FastAPI interface with automatic documentation
-
-
-
-## 🚀 Quick Start### 🐘 PostgreSQL Cache Integration
-
+### 🐘 PostgreSQL Cache Integration
 - **Intelligent Result Caching**: Automatic caching based on input hash
-
-```bash- **Performance Tracking**: Detailed metrics and statistics
-
-# Start all services- **TTL Management**: Configurable cache expiration (default 24 hours)
-
-docker-compose up -d- **Error Caching**: Avoid reprocessing failed inputs
-
+- **Performance Tracking**: Detailed metrics and statistics
+- **TTL Management**: Configurable cache expiration (default 24 hours)
+- **Error Caching**: Avoid reprocessing failed inputs
 - **98% Performance Improvement**: Cache hits respond in ~50-100ms vs 2-5s
 
-# Check health
-
-curl http://localhost:8000/health### 📊 Monitoring & Metrics
-
+### 📊 Monitoring & Metrics
 - **Prometheus Integration**: Comprehensive metrics collection
-
-# View API docs- **Rich Logging**: Beautiful colored console output with emojis
-
-open http://localhost:8000/docs- **Health Checks**: Built-in service monitoring
-
-```- **Grafana Ready**: Pre-configured dashboards and data sources
-
+- **Rich Logging**: Beautiful colored console output with emojis
+- **Health Checks**: Built-in service monitoring
+- **Grafana Ready**: Pre-configured dashboards and data sources
 - **Live Monitoring**: Real-time metrics dashboard
 
-## 📁 Project Structure
-
 ### 🐳 Docker & DevOps
+- **Complete Docker Setup**: Multi-service orchestration
+- **Development Mode**: Hot reload and debugging support
+- **Monitoring Stack**: Optional Prometheus + Grafana integration
+- **Production Ready**: Scalable configuration with resource limits
 
-```- **Complete Docker Setup**: Multi-service orchestration
+## 🚀 Quick Start
 
-app/- **Development Mode**: Hot reload and debugging support
-
-├── models/          # Pydantic validation schemas- **Monitoring Stack**: Optional Prometheus + Grafana integration
-
-├── database/        # SQLAlchemy models & connection- **Production Ready**: Scalable configuration with resource limits
-
-├── tasks/           # Celery background tasks
-
-├── api/             # FastAPI route handlers## 🚀 Quick Start
-
-├── core/            # Configuration & Celery setup
-
-├── services/        # Business services (cache)### Option 1: Basic Setup (Fastest)
-
-├── monitoring/      # Metrics & logging```bash
-
-└── utils/           # Image processing & SVG generation# Start core services (API + Worker + Redis + PostgreSQL)
-
-```make build
-
+### Option 1: Basic Setup (Fastest)
+```bash
+# Start core services (API + Worker + Redis + PostgreSQL)
+make build
 make up
 
-## 📖 Documentation
-
 # Check service health
+curl http://localhost:8000/health
 
-Comprehensive documentation is available in the [`docs/`](docs/) folder:curl http://localhost:8000/health
+# View beautiful logs
+make logs
+```
 
-
-
-- **[Quick Reference](docs/QUICK_REFERENCE.md)** - Developer quick start guide# View beautiful logs
-
-- **[Project Structure](docs/PROJECT_STRUCTURE.md)** - Detailed architecture documentationmake logs
-
-- **[Testing Guide](docs/TESTING_GUIDE.md)** - How to run tests```
-
-- **[Testing Restructured](docs/TESTING_RESTRUCTURED.md)** - Testing the new modular structure
-
-- **[Restructuring Summary](docs/RESTRUCTURING_SUMMARY.md)** - Complete migration details### Option 2: Full Monitoring Stack
-
+### Option 2: Full Monitoring Stack
 ```bash
-
-## 🔌 API Endpoints# Start everything including Prometheus + Grafana
-
+# Start everything including Prometheus + Grafana
 make monitoring
 
-### Submit Async Task
-
-```bash# Access services
-
-POST /api/v1/frontal/crop/submit_asyncopen http://localhost:8000      # API Documentation
-
-```open http://localhost:9090      # Prometheus Metrics
-
+# Access services
+open http://localhost:8000      # API Documentation
+open http://localhost:9090      # Prometheus Metrics
 open http://localhost:3000      # Grafana Dashboard (admin/admin123)
-
-**Input:**```
-
-```json
-
-{### Option 3: Local Development
-
-  "image": "base64_encoded_image",```bash
-
-  "landmarks": [{"x": 100.5, "y": 200.3}, ...], // 478 landmarks# Install dependencies
-
-  "dimensions": [640, 480]pip install -r pyproject.toml
-
-}
-
-```# Configure Python environment
-
-python -m venv venv
-
-**Output:**source venv/bin/activate
-
-```json
-
-{# Start supporting services
-
-  "task_id": "abc123...",docker-compose up redis postgres -d
-
-  "status": "PENDING",
-
-  "submitted_at": "2024-01-15T10:30:00"# Start worker (terminal 1)
-
-}celery -A celery_config worker --loglevel=info
-
 ```
+
+### Option 3: Local Development
+```bash
+# Install dependencies
+pip install -r pyproject.toml
+
+# Configure Python environment
+python -m venv venv
+source venv/bin/activate
+
+# Start supporting services
+docker-compose up redis postgres -d
+
+# Start worker (terminal 1)
+celery -A celery_config worker --loglevel=info
 
 # Start API (terminal 2)  
+python main.py
+```
 
-### Check Task Statuspython main.py
+## 📊 Available Services
 
-```bash```
-
-GET /api/v1/frontal/crop/status/{task_id}
-
-```## 📊 Available Services
-
-
-
-### Other Endpoints| Service | Port | Description | Health Check |
-
-- `GET /health` - Health check|---------|------|-------------|--------------|
-
-- `GET /api/v1/cache/stats` - Cache statistics| **FastAPI** | 8000 | Main API with Rich logging | `/health` |
-
-- `GET /api/v1/cache/recent` - Recent tasks| **Metrics** | 8000/metrics | Prometheus metrics endpoint | Auto |
-
-- `GET /metrics` - Prometheus metrics| **PostgreSQL** | 5432 | Cache database | Built-in |
-
+| Service | Port | Description | Health Check |
+|---------|------|-------------|--------------|
+| **FastAPI** | 8000 | Main API with Rich logging | `/health` |
+| **Metrics** | 8000/metrics | Prometheus metrics endpoint | Auto |
+| **PostgreSQL** | 5432 | Cache database | Built-in |
 | **Redis** | 6379 | Task queue backend | Built-in |
-
-## 🐳 Docker Services| **Prometheus** | 9090 | Metrics collection (optional) | `/health` |
-
+| **Prometheus** | 9090 | Metrics collection (optional) | `/health` |
 | **Grafana** | 3000 | Visualization (optional) | `/api/health` |
 
-| Service | Port | Description |
+## 🛠️ API Usage
 
-|---------|------|-------------|## 🛠️ API Usage
+### Core Endpoints
 
-| API | 8000 | FastAPI application |
-
-| PostgreSQL | 5432 | Result cache database |### Core Endpoints
-
-| Redis | 6379 | Celery task queue |
-
-| Prometheus | 9090 | Metrics (optional) |**Primary Processing Endpoint (Synchronous):**
-
-| Grafana | 3000 | Dashboards (optional) |```bash
-
-POST /api/v1/frontal/crop/submit
-
-## 🧪 TestingContent-Type: application/json
-
-```
-
+**Primary Processing Endpoint (Synchronous):**
 ```bash
-
-# Run test suite**Input Format:**
-
-python test_docker_api.py```json
-
-{
-
-# Test with sample data  "image": "base64_encoded_image_string",
-
-curl -X POST http://localhost:8000/api/v1/frontal/crop/submit_async \  "landmarks": [
-
-  -H "Content-Type: application/json" \    {"x": 123.45, "y": 67.89},
-
-  -d @sample_landmarks.json    {"x": 124.56, "y": 68.90},
-
-```    ...
-
-  ],
-
-## 🛠️ Development  "segmentation_map": "base64_encoded_segmentation_map_string"
-
-}
-
-```bash```
-
-# Install dependencies
-
-pip install -r pyproject.toml**Output Format:**
-
-```json
-
-# Run locally{
-
-python main.py        # API server  "svg": "base64_encoded_svg_string",
-
-python run_worker.py  # Celery worker  "mask_contours": {
-
-    "1": [[x1, y1], [x2, y2], ...],
-
-# View logs    "2": [[x1, y1], [x2, y2], ...],
-
-docker-compose logs -f api    ...
-
-docker-compose logs -f worker  }
-
-```}
-
+POST /api/v1/frontal/crop/submit
+Content-Type: application/json
 ```
 
-## 📊 Monitoring
+**Input Format:**
+```json
+{
+  "image": "base64_encoded_image_string",
+  "landmarks": [
+    {"x": 123.45, "y": 67.89},
+    {"x": 124.56, "y": 68.90},
+    ...
+  ],
+  "segmentation_map": "base64_encoded_segmentation_map_string"
+}
+```
+
+**Output Format:**
+```json
+{
+  "svg": "base64_encoded_svg_string",
+  "mask_contours": {
+    "1": [[x1, y1], [x2, y2], ...],
+    "2": [[x1, y1], [x2, y2], ...],
+    ...
+  }
+}
+```
 
 **Async Processing Endpoint (Background Task) - NEW MediaPipe Regions:**
-
-**Prometheus Metrics:**```bash
-
-- Task processing durationPOST /api/v1/frontal/crop/submit_async
-
-- Cache hit/miss ratioContent-Type: application/json
-
-- API request latency```
-
-- Error rates
+```bash
+POST /api/v1/frontal/crop/submit_async
+Content-Type: application/json
+```
 
 **Features:**
+- 5 MediaPipe facial regions (forehead, nose, left_under_eye, right_under_eye, mouth)
+- Embedded original image in SVG output
+- Numbered labels on each region
+- Customizable colors and opacity
+- Returns task ID for status polling
 
-**Rich Logging:**- 5 MediaPipe facial regions (forehead, nose, left_under_eye, right_under_eye, mouth)
-
-- Beautiful colored console output- Embedded original image in SVG output
-
-- Request/response tracking- Numbered labels on each region
-
-- Performance metrics- Customizable colors and opacity
-
-- Error stack traces- Returns task ID for status polling
-
-
-
-## 🎯 MediaPipe Facial Regions**Other Endpoints:**
-
+**Other Endpoints:**
 ```bash
-
-The service processes 478 MediaPipe landmarks into 5 regions:# Check async task status  
-
+# Check async task status  
 GET /api/v1/frontal/crop/status/{task_id}
 
-1. **Forehead** (Region 1) - Upper facial area
-
-2. **Nose** (Region 2) - Nasal region# Health check
-
-3. **Left Under Eye** (Region 3) - Left infraorbital areaGET /health
-
-4. **Right Under Eye** (Region 4) - Right infraorbital area```
-
-5. **Mouth** (Region 5) - Oral area
+# Health check
+GET /health
+```
 
 ### Cache Management
-
-Each region is rendered with distinct colors at 65% opacity in the generated SVG.```bash
-
+```bash
 # View cache statistics
+GET /api/v1/cache/stats?days=7
 
-## 📝 ConfigurationGET /api/v1/cache/stats?days=7
+# Recent processed tasks
+GET /api/v1/cache/recent?limit=10
 
-
-
-Environment variables (`.env`):# Recent processed tasks
-
-```bashGET /api/v1/cache/recent?limit=10
-
-DATABASE_URL=postgresql://user:pass@localhost:5432/dbname
-
-REDIS_URL=redis://localhost:6379/0# Clean expired entries
-
-CELERY_BROKER_URL=redis://localhost:6379/0POST /api/v1/cache/cleanup
-
-CELERY_RESULT_BACKEND=redis://localhost:6379/0```
-
+# Clean expired entries
+POST /api/v1/cache/cleanup
 ```
 
 ### Example Request
-
-## 🤝 Contributing```python
-
+```python
 import requests
+import base64
 
-1. Follow the modular structure in `app/`import base64
+# Prepare your data
+with open('face_image.jpg', 'rb') as f:
+    image_data = base64.b64encode(f.read()).decode('utf-8')
 
-2. Add tests for new features
-
-3. Update documentation in `docs/`# Prepare your data
-
-4. Use Rich logging for outputwith open('face_image.jpg', 'rb') as f:
-
-5. Add Prometheus metrics for monitoring    image_data = base64.b64encode(f.read()).decode('utf-8')
-
-
-
-## 📄 Licensewith open('segmentation_map.png', 'rb') as f:
-
+with open('segmentation_map.png', 'rb') as f:
     seg_map_data = base64.b64encode(f.read()).decode('utf-8')
 
-See LICENSE file for details.
-
 # Create landmarks array (478 points required)
-
-## 🔗 Additional Resourceslandmarks = [
-
+landmarks = [
     {"x": 123.45, "y": 67.89},
-
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)    {"x": 124.56, "y": 68.90},
-
-- [Celery Documentation](https://docs.celeryq.dev/)    # ... 476 more landmarks
-
-- [MediaPipe Face Mesh](https://google.github.io/mediapipe/solutions/face_mesh.html)]
-
-- [Prometheus Metrics](https://prometheus.io/docs/introduction/overview/)
+    {"x": 124.56, "y": 68.90},
+    # ... 476 more landmarks
+]
 
 # Submit processing request
-
----payload = {
-
+payload = {
     "image": image_data,
-
-**Need help?** Check the [documentation](docs/) folder or the [Quick Reference Guide](docs/QUICK_REFERENCE.md).    "landmarks": landmarks,
-
+    "landmarks": landmarks,
     "segmentation_map": seg_map_data
 }
 

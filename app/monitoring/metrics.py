@@ -205,6 +205,9 @@ def get_metrics() -> str:
     """Get current metrics in Prometheus format."""
     return generate_latest()
 
+# Alias for backward compatibility
+task_counter = task_completions_total
+
 # Custom metrics for FastAPI instrumentator
 def add_custom_metrics():
     """Add custom metrics to the instrumentator."""

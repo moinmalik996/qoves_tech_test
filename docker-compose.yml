@@ -12,7 +12,6 @@ services:
       POSTGRES_PASSWORD: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
@@ -75,6 +74,7 @@ services:
       - TERM=xterm-256color
       - COLORTERM=truecolor
       - FORCE_COLOR=1
+      - PYTHONPATH=/app
     depends_on:
       redis:
         condition: service_healthy
@@ -84,9 +84,9 @@ services:
         condition: service_healthy
     volumes:
       - ./logs:/app/logs
-    command: celery -A celery_config worker --loglevel=info --concurrency=2
+    command: python app/core/run_worker.py
     healthcheck:
-      test: ["CMD-SHELL", "celery -A celery_config inspect ping"]
+      test: ["CMD-SHELL", "celery -A app.core.celery_app inspect ping"]
       interval: 30s
       timeout: 10s
       retries: 3

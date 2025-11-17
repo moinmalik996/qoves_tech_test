@@ -2,8 +2,15 @@
 """
 Celery worker startup script for facial processing tasks.
 """
+import sys
+from pathlib import Path
 
-from celery_config import celery_app
+from app.core.celery_app import celery_app
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 
 if __name__ == '__main__':
     # Start the Celery worker
