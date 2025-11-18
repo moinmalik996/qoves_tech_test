@@ -13,12 +13,32 @@ class FacialRequest(BaseModel):
     """Request model for facial region processing."""
     image: str = Field(..., description="Base64 encoded image")
     landmarks: List[Landmark] = Field(..., min_items=478, max_items=478)
-    segmentation_map: str = Field(..., description="Base64 encoded segmentation map")
+    segmentation_map: dict = Field(
+        ..., 
+        description="Dictionary mapping region names to lists of landmark indices"
+    )
     
     @validator('landmarks')
     def validate_landmarks_count(cls, v):
         if len(v) != 478:
             raise ValueError(f'Expected exactly 478 landmarks, got {len(v)}')
+        return v
+    
+    @validator('segmentation_map')
+    def validate_segmentation_map(cls, v):
+        """Validate segmentation map structure."""
+        if not isinstance(v, dict):
+            raise ValueError('segmentation_map must be a dictionary')
+        
+        # Check that all values are lists of integers
+        for region_name, indices in v.items():
+            if not isinstance(indices, list):
+                raise ValueError(f'Region "{region_name}" must have a list of indices')
+            if not all(isinstance(idx, int) for idx in indices):
+                raise ValueError(f'Region "{region_name}" must contain only integers')
+            if not all(0 <= idx < 478 for idx in indices):
+                raise ValueError(f'Region "{region_name}" contains invalid landmark indices (must be 0-477)')
+        
         return v
 
 

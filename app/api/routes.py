@@ -55,11 +55,15 @@ async def submit_facial_processing_task_async(
         # Convert landmarks to dict format
         landmarks = [{"x": lm.x, "y": lm.y} for lm in request.landmarks]
         
+        # Use custom segmentation_map from request
+        segmentation_map = request.segmentation_map
+        
         # Submit the task to Celery with optional parameters
         task = process_facial_regions_task.delay(
             image_base64=request.image,
             landmarks=landmarks,
             dimensions=dimensions,
+            segmentation_map=segmentation_map,
             show_labels=show_labels,
             region_opacity=region_opacity,
             stroke_width=stroke_width

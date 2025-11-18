@@ -3,9 +3,6 @@ from celery import Task
 from typing import Dict, List
 
 from app.core.celery_app import celery_app
-from app.database.models import TaskResult
-from app.database.connection import SessionLocal
-from app.database.utils import generate_cache_key
 from app.core.config import MEDIAPIPE_FACE_REGIONS, DEFAULT_REGION_COLORS
 from app.utils.image_processing import encode_svg_to_base64, get_region_contours
 from app.utils.svg_generation import generate_svg_mask_overlay
@@ -37,6 +34,7 @@ def process_facial_regions_task(
     image_base64: str,
     landmarks: List[Dict],
     dimensions: List[int],
+    segmentation_map: Dict[str, List[int]] = None,
     show_labels: bool = True,
     region_opacity: float = 0.65,
     stroke_width: int = 0,
@@ -49,6 +47,7 @@ def process_facial_regions_task(
         image_base64: Base64 encoded image
         landmarks: List of 478 MediaPipe facial landmarks
         dimensions: [width, height] of the image
+        segmentation_map: Custom region mapping (dict of region_name -> landmark indices)
         show_labels: Whether to show region labels (numbers)
         region_opacity: Opacity level for region masks (0.0 to 1.0)
         stroke_width: Width of stroke around regions (0 for no stroke)
@@ -73,15 +72,28 @@ def process_facial_regions_task(
             for lm in landmarks
         ]
         
-        # Generate SVG mask overlay with MediaPipe regions
+        # Use custom segmentation_map if provided, otherwise use default MEDIAPIPE_FACE_REGIONS
+        facial_regions = segmentation_map if segmentation_map else MEDIAPIPE_FACE_REGIONS
+        
+        # Generate region colors - use defaults or create colors for custom regions
+        if segmentation_map:
+            # For custom regions, use default purple color or map to existing colors
+            region_colors = {}
+            for region_name in segmentation_map.keys():
+                # Try to match with default colors, otherwise use purple
+                region_colors[region_name] = DEFAULT_REGION_COLORS.get(region_name, '#B695C0')
+        else:
+            region_colors = DEFAULT_REGION_COLORS
+        
+        # Generate SVG mask overlay with regions
         # Following the exact structure from the provided script
         svg_content = generate_svg_mask_overlay(
             dimensions=dimensions,
             landmarks=landmark_points,
             image_base64=image_base64,
-            facial_regions=MEDIAPIPE_FACE_REGIONS,
-            region_colors=DEFAULT_REGION_COLORS,
-            region_opacity={region: region_opacity for region in MEDIAPIPE_FACE_REGIONS.keys()},
+            facial_regions=facial_regions,
+            region_colors=region_colors,
+            region_opacity={region: region_opacity for region in facial_regions.keys()},
             show_labels=show_labels,
             stroke_width=stroke_width
         )
@@ -89,9 +101,9 @@ def process_facial_regions_task(
         # Encode SVG to base64
         svg_base64 = encode_svg_to_base64(svg_content)
         
-        # Extract region contours
+        # Extract region contours using the actual facial_regions (custom or default)
         region_data = {}
-        for region_name, indices in MEDIAPIPE_FACE_REGIONS.items():
+        for region_name, indices in facial_regions.items():
             contours = get_region_contours(landmark_points, indices)
             region_data[region_name] = contours
         
@@ -101,28 +113,25 @@ def process_facial_regions_task(
             'region_data': region_data
         }
         
-        # Cache the result in database
+        # Cache the result with perceptual hashing
         try:
-            cache_key = generate_cache_key(landmarks, dimensions)
-            db = SessionLocal()
+            from app.services.cache import cache_service
             
-            # Check if already cached
-            existing = db.query(TaskResult).filter_by(cache_key=cache_key).first()
-            if existing:
-                logger.info(f"[Task {task_id}] Updating existing cache entry")
-                existing.result = result
-                existing.task_id = task_id
+            success = cache_service.store_task_result_with_phash(
+                task_id=task_id,
+                image_base64=image_base64,
+                landmarks=landmarks,
+                result_data=result,
+                show_labels=show_labels,
+                region_opacity=region_opacity,
+                stroke_width=stroke_width,
+                processing_time_ms=0.0  # Can add timing later
+            )
+            
+            if success:
+                logger.info(f"[Task {task_id}] Result cached with perceptual hash")
             else:
-                logger.info(f"[Task {task_id}] Creating new cache entry")
-                task_result = TaskResult(
-                    task_id=task_id,
-                    cache_key=cache_key,
-                    result=result
-                )
-                db.add(task_result)
-            
-            db.commit()
-            db.close()
+                logger.warning(f"[Task {task_id}] Failed to cache result")
             
         except Exception as cache_error:
             logger.error(f"[Task {task_id}] Cache storage failed: {cache_error}")

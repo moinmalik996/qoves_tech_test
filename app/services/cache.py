@@ -340,6 +340,194 @@ class CacheService:
             cache_logger.debug(f"[warning]📊 Metric recording failed: {str(e)}[/]")
         finally:
             db.close()
+    
+    def get_perceptual_cached_result(
+        self, 
+        image_base64: str,
+        landmarks: list,
+        show_labels: bool = True,
+        region_opacity: float = 0.65,
+        stroke_width: int = 0,
+        similarity_threshold: int = 10
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve cached result using perceptual hashing for similar images.
+        Falls back to exact matching if no similar images found.
+        
+        Args:
+            image_base64: Base64 encoded image
+            landmarks: List of landmarks
+            show_labels: Whether labels are shown
+            region_opacity: Opacity value
+            stroke_width: Stroke width
+            similarity_threshold: Maximum Hamming distance for similarity (default 10)
+            
+        Returns:
+            Cached result dict or None if not found
+        """
+        from app.utils.perceptual_hash import (
+            generate_perceptual_cache_key,
+            hamming_distance
+        )
+        
+        db = SessionLocal()
+        try:
+            # Generate both perceptual and exact keys
+            perceptual_hash, exact_key = generate_perceptual_cache_key(
+                image_base64, landmarks, show_labels, region_opacity, stroke_width
+            )
+            
+            cache_logger.debug(f"[cache]🔍 Perceptual lookup: {perceptual_hash[:12]}...[/]")
+            
+            # First try exact match
+            exact_match = db.query(TaskResult).filter(
+                and_(
+                    TaskResult.input_hash == exact_key,
+                    TaskResult.status == 'SUCCESS',
+                    or_(
+                        TaskResult.ttl_expires_at.is_(None),
+                        TaskResult.ttl_expires_at > datetime.utcnow()
+                    )
+                )
+            ).first()
+            
+            if exact_match:
+                exact_match.cache_hits += 1
+                exact_match.last_accessed = datetime.utcnow()
+                db.commit()
+                cache_logger.info("[success]💾 EXACT Cache HIT[/]")
+                self._record_cache_metric("exact_cache_hit", exact_key)
+                
+                return {
+                    "task_id": exact_match.task_id,
+                    "status": "SUCCESS",
+                    "result": exact_match.result_data,
+                    "processing_time_ms": exact_match.processing_time_ms,
+                    "cache_hit": True,
+                    "cache_type": "exact",
+                    "cache_hits": exact_match.cache_hits
+                }
+            
+            # Try perceptual matching - get candidates with similar hashes
+            candidates = db.query(TaskResult).filter(
+                and_(
+                    TaskResult.perceptual_hash.isnot(None),
+                    TaskResult.status == 'SUCCESS',
+                    or_(
+                        TaskResult.ttl_expires_at.is_(None),
+                        TaskResult.ttl_expires_at > datetime.utcnow()
+                    )
+                )
+            ).all()
+            
+            # Find best match within threshold
+            best_match = None
+            best_distance = similarity_threshold + 1
+            
+            for candidate in candidates:
+                if candidate.perceptual_hash:
+                    distance = hamming_distance(perceptual_hash, candidate.perceptual_hash)
+                    if distance < best_distance:
+                        best_distance = distance
+                        best_match = candidate
+            
+            if best_match and best_distance <= similarity_threshold:
+                best_match.cache_hits += 1
+                best_match.last_accessed = datetime.utcnow()
+                db.commit()
+                
+                cache_logger.info(
+                    f"[success]🎯 PERCEPTUAL Cache HIT "
+                    f"(distance: {best_distance}/{similarity_threshold})[/]"
+                )
+                self._record_cache_metric("perceptual_cache_hit", perceptual_hash)
+                
+                return {
+                    "task_id": best_match.task_id,
+                    "status": "SUCCESS",
+                    "result": best_match.result_data,
+                    "processing_time_ms": best_match.processing_time_ms,
+                    "cache_hit": True,
+                    "cache_type": "perceptual",
+                    "similarity_distance": best_distance,
+                    "cache_hits": best_match.cache_hits
+                }
+            
+            cache_logger.debug("[warning]❌ No similar cached results found[/]")
+            self._record_cache_metric("perceptual_cache_miss", perceptual_hash)
+            return None
+            
+        except Exception as e:
+            cache_logger.error(f"[error]💥 Perceptual cache lookup error: {str(e)}[/]")
+            errors_total.labels(error_type=type(e).__name__, component="perceptual_cache").inc()
+            return None
+        finally:
+            db.close()
+    
+    def store_task_result_with_phash(
+        self,
+        task_id: str,
+        image_base64: str,
+        landmarks: list,
+        result_data: Dict[str, Any],
+        show_labels: bool = True,
+        region_opacity: float = 0.65,
+        stroke_width: int = 0,
+        processing_time_ms: float = 0
+    ) -> bool:
+        """
+        Store task result with both exact and perceptual hashing.
+        
+        Returns:
+            True if stored successfully
+        """
+        from app.utils.perceptual_hash import generate_perceptual_cache_key
+        
+        db = SessionLocal()
+        try:
+            # Generate both keys
+            perceptual_hash, exact_key = generate_perceptual_cache_key(
+                image_base64, landmarks, show_labels, region_opacity, stroke_width
+            )
+            
+            # Calculate TTL
+            ttl_expires_at = datetime.utcnow() + timedelta(hours=self.default_ttl_hours)
+            
+            # Check if already exists
+            existing = db.query(TaskResult).filter_by(input_hash=exact_key).first()
+            
+            if existing:
+                cache_logger.info("[cache]🔄 Updating existing cache entry[/]")
+                existing.result_data = result_data
+                existing.perceptual_hash = perceptual_hash
+                existing.processing_time_ms = processing_time_ms
+                existing.ttl_expires_at = ttl_expires_at
+                existing.last_accessed = datetime.utcnow()
+            else:
+                cache_logger.info("[cache]💾 Creating new cache entry with pHash[/]")
+                task_result = TaskResult(
+                    task_id=task_id,
+                    input_hash=exact_key,
+                    perceptual_hash=perceptual_hash,
+                    status='SUCCESS',
+                    result_data=result_data,
+                    processing_time_ms=processing_time_ms,
+                    ttl_expires_at=ttl_expires_at,
+                    show_landmarks=str(show_labels),
+                    region_opacity=region_opacity
+                )
+                db.add(task_result)
+            
+            db.commit()
+            cache_logger.info("[success]✅ Task result stored with perceptual hash[/]")
+            return True
+            
+        except Exception as e:
+            cache_logger.error(f"[error]💥 Failed to store result: {str(e)}[/]")
+            db.rollback()
+            return False
+        finally:
+            db.close()
 
 # Global cache service instance
 cache_service = CacheService()

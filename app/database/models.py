@@ -18,6 +18,7 @@ class TaskResult(Base):
     
     # Input data hash for cache lookup
     input_hash = Column(String(64), index=True, nullable=False)
+    perceptual_hash = Column(String(64), index=True, nullable=True)  # For similarity search
     
     # Task metadata
     status = Column(String(50), nullable=False, default='PENDING')
@@ -54,9 +55,11 @@ class TaskResult(Base):
     # Indexes for performance
     __table_args__ = (
         Index('idx_task_results_input_hash', 'input_hash'),
+        Index('idx_task_results_perceptual_hash', 'perceptual_hash'),
         Index('idx_task_results_status', 'status'),
         Index('idx_task_results_submitted_at', 'submitted_at'),
         Index('idx_task_results_cache_lookup', 'input_hash', 'status'),
+        Index('idx_task_results_perceptual_lookup', 'perceptual_hash', 'status'),
         Index('idx_task_results_ttl', 'ttl_expires_at'),
     )
 
