@@ -1,8 +1,21 @@
-"""SVG generation utilities."""
+"""
+A seperate script to generate an SVG overlay with colored masks over facial regions
+based on MediaPipe Face Mesh landmarks, with an improved forehead extension method.
+"""
+
 import base64
 from typing import List, Dict
 import numpy as np
-from app.core.config import MEDIAPIPE_FACE_REGIONS, DEFAULT_REGION_COLORS
+
+
+# MediaPipe Face Mesh 478 landmark indices for facial regions
+MEDIAPIPE_FACE_REGIONS = {
+    'forehead': [127, 162, 21, 54, 103, 67, 109, 10, 338, 297, 332, 284, 251, 389, 301, 293, 334, 296, 336, 9, 107, 66, 105, 63, 70],
+    'nose': [55, 8, 285, 417, 412, 437, 420, 429, 279, 358, 294, 327, 326, 2, 97, 98, 64, 129, 49, 209, 198, 236, 196, 122, 193],
+    "left_under_eye": [35, 226, 25, 110, 24, 23, 22, 26, 112, 244, 245, 128, 121, 120, 119, 118, 117, 111],
+    "right_under_eye": [465, 464, 341, 256, 252, 253, 254, 339, 255, 359, 353, 383, 372, 340, 346, 347, 348, 349, 350, 357],
+    'mouth': [234, 116, 36, 203, 165, 167, 164, 393, 391, 423, 266, 330, 345, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93]
+}
 
 
 def landmarks_to_svg_path(landmarks: List[Dict[str, float]], closed: bool = True, smooth: bool = True) -> str:
@@ -217,6 +230,7 @@ def extrapolate_forehead_to_hairline(
 def generate_svg_mask_overlay(
     dimensions: List[int],
     landmarks: List[Dict[str, float]],
+    image_path: str = None,
     image_base64: str = None,
     facial_regions: Dict[str, List[int]] = None,
     region_colors: Dict[str, str] = None,
@@ -230,7 +244,8 @@ def generate_svg_mask_overlay(
     Args:
         dimensions: [width, height] of the image
         landmarks: List of all facial landmarks with 'x' and 'y' keys (478 for MediaPipe)
-        image_base64: Base64 encoded image
+        image_path: Path to the portrait image file
+        image_base64: Base64 encoded image (alternative to image_path)
         facial_regions: Dict mapping region names to landmark indices
         region_colors: Dict mapping region names to colors (hex format)
         region_opacity: Dict mapping region names to opacity values (0.0-1.0)
@@ -252,13 +267,27 @@ def generate_svg_mask_overlay(
             'mouth': MEDIAPIPE_FACE_REGIONS['mouth'],
         }
 
-    # Default colors
+    # Default colors (purple/violet theme like your example)
     if region_colors is None:
-        region_colors = DEFAULT_REGION_COLORS.copy()
+        region_colors = {
+            'forehead': '#B695C0',           # Purple for forehead (region 1)
+            'nose': '#D4A574',               # Beige/tan for nose (region 5)
+            'left_under_eye': '#B695C0',     # Purple for left under eye
+            'right_under_eye': '#B695C0',
+            'mouth': '#B695C0',               # Purple for mouth area
+        }
 
     # Default opacity
     if region_opacity is None:
-        region_opacity = {region: 0.65 for region in facial_regions.keys()}
+        region_opacity = {region: 0.6 for region in facial_regions.keys()}
+
+    # Prepare image embedding
+    image_data = ""
+    if image_base64:
+        image_data = image_base64
+    elif image_path:
+        with open(image_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode()
 
     # Start SVG
     svg_parts = [
@@ -266,24 +295,15 @@ def generate_svg_mask_overlay(
     ]
 
     # Embed the background image if provided
-    if image_base64:
-        # Remove data URL prefix if present
-        if ',' in image_base64:
-            image_base64 = image_base64.split(',')[1]
-        
-        # Detect image format (default to jpeg)
+    if image_data:
+        # Detect image format
         img_format = "jpeg"
-        try:
-            # Try to detect format from base64 data
-            img_data = base64.b64decode(image_base64[:100])
-            if img_data.startswith(b'\x89PNG'):
-                img_format = "png"
-        except Exception:
-            pass
+        if image_path and image_path.lower().endswith('.png'):
+            img_format = "png"
 
         svg_parts.append(
             f'  <image width="{width}" height="{height}" '
-            f'xlink:href="data:image/{img_format};base64,{image_base64}"/>'
+            f'xlink:href="data:image/{img_format};base64,{image_data}"/>'
         )
 
     # Draw each facial region as filled mask
@@ -315,7 +335,7 @@ def generate_svg_mask_overlay(
         # Convert to SVG path
         path_d = landmarks_to_svg_path(region_landmarks, closed=True)
         color = region_colors[region_name]
-        opacity = region_opacity.get(region_name, 0.65)
+        opacity = region_opacity.get(region_name, 0.6)
 
         # Draw filled region
         svg_parts.append(
@@ -346,3 +366,50 @@ def generate_svg_mask_overlay(
     svg_parts.append('</svg>')
 
     return '\n'.join(svg_parts)
+
+# Example usage with your MediaPipe data
+if __name__ == "__main__":
+
+    from landmarks import landmarks_data  # Assuming landmarks_data is a list of dicts with 'x' and 'y' keys
+
+    dimensions = [1101, 1100]
+
+    # Customize regions and colors to match your example
+    custom_regions = {
+        'forehead': MEDIAPIPE_FACE_REGIONS['forehead'],
+        'nose': MEDIAPIPE_FACE_REGIONS['nose'],
+        'left_under_eye': MEDIAPIPE_FACE_REGIONS['left_under_eye'],
+        'right_under_eye': MEDIAPIPE_FACE_REGIONS['right_under_eye'],
+        'mouth': MEDIAPIPE_FACE_REGIONS['mouth'],
+    }
+
+    custom_colors = {
+        'forehead': '#4A90E2',          # Bright Blue
+        'nose': '#7ED321',              # Fresh Green
+        'left_under_eye': '#F5A623',    # Warm Amber
+        'right_under_eye': '#F5A623',   # Warm Amber
+        'mouth': '#D0021B',             # Strong Crimson
+}
+
+    custom_opacity = {
+        'forehead': 0.65,
+        'nose': 0.65,
+        'left_under_eye': 0.65,
+        'right_under_eye': 0.65,
+        'mouth': 0.65,
+    }
+
+    svg_content = generate_svg_mask_overlay(
+        dimensions=dimensions,
+        landmarks=landmarks_data,
+        image_path="data/original_image.png",  # CHANGE THIS to your image path
+        facial_regions=custom_regions,
+        region_colors=custom_colors,
+        region_opacity=custom_opacity,
+        show_labels=True,
+        stroke_width=0
+    )
+
+    # Save the SVG
+    with open("face_mask_overlay.svg", "w") as f:
+        f.write(svg_content)
